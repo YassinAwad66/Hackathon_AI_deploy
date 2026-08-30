@@ -48,6 +48,21 @@ risk pricing, public health, or general climate/environmental analysis. If a
 question comes from a domain not listed here, still answer it as best you can
 using the provided data and general climate/safety reasoning.
 
+Answering policy — ALWAYS attempt a real answer:
+- If the question concerns climate, weather, heat/cold, energy, industry,
+  construction, buildings, agriculture, air quality, or related safety/risk/
+  operational topics, you must attempt a substantive answer. Do not refuse
+  or hedge into a non-answer just because the environmental_data provided is
+  incomplete — supplementary web context is fetched specifically to fill
+  those gaps, so use it.
+- Only leave "answer" as a non-answer (and treat the question as out of
+  scope) if it is genuinely unrelated to climate/weather/environment/energy/
+  industry/buildings, e.g. a question with no connection to any of those
+  topics.
+- Do not set data_missing=true merely because environmental_data alone is
+  sparse. Only set it true if BOTH the environmental_data AND the
+  supplementary web context fail to provide what's needed to answer.
+
 Instructions:
 - Base every field primarily on the environmental data provided.
 - You may also be given a block of "Supplementary web context" retrieved from
@@ -56,7 +71,10 @@ Instructions:
   index, AQI, etc.) UNLESS the web context clearly indicates something more
   current or directly contradicts it (e.g. an active heat advisory, a
   forecast, or a news event) — in that case, note the discrepancy explicitly
-  in "answer" rather than silently picking one.
+  in "answer" rather than silently picking one. When environmental_data is
+  missing a value the question needs, use the value found in the web context
+  instead of leaving it out, and note in "answer" that it came from a live
+  search rather than the sensor/API data.
 - Do not invent or assume any environmental data not provided by either the
   environmental_data or the supplementary web context.
 - Assume temperatures are in Celsius (°C) and humidity/AQI values are in
@@ -80,18 +98,23 @@ Instructions:
   angle. Leave it as an empty list otherwise.
 - Populate "key_metrics" with the specific numeric values relevant to the
   answer (e.g. temperature, humidity, heat index, AQI) so the frontend can
-  display them as stat cards.
+  display them as stat cards, including any values sourced from the web
+  context when environmental_data didn't have them.
 - Populate "external_sources" with short labels/titles for any web sources
   you actually relied on from the supplementary web context (leave empty if
   none were used or none were provided).
 - Set "confidence" to "low", "medium", or "high" based on how complete and
   directly relevant the provided data (including any web context) is to the
   question. Sparse, indirect, or partially missing data should lower
-  confidence; complete, directly relevant data should raise it.
-- If data needed to answer is missing or insufficient, set data_missing=true
-  and say so in the answer rather than guessing.
-- If the question is entirely unrelated to climate/weather/environment, say
-  so in "answer" and leave the other fields empty/null.
+  confidence; complete, directly relevant data should raise it. Filling a
+  gap from web context rather than sensor data should not by itself force
+  "low" — use "medium" if the web-sourced value is clear and specific.
+- If, after considering BOTH environmental_data and the web context, the
+  needed data genuinely isn't available anywhere, set data_missing=true and
+  say so plainly in the answer rather than guessing.
+- If the question is entirely unrelated to climate/weather/environment/
+  energy/industry/buildings, say so in "answer" and leave the other fields
+  empty/null.
 
 Charts and comparisons:
 - Use "chart_series" for anything plottable. Each entry in "chart_series" is
@@ -124,13 +147,27 @@ Handling forecast / future questions:
 SEARCH_SYSTEM_INSTRUCTION = """You are a research assistant supporting a climate/heat-risk
 system called Heat Guardian. Given a user's question and some known environmental
 data (location, current readings), use web search to find any CURRENT, directly
-relevant supplementary information — e.g. active heat advisories or warnings,
-official weather forecasts, recent local air quality reports, or relevant news —
-for that location and timeframe.
+relevant supplementary information needed to fully answer the question.
+
+Your job is to actively fill gaps, not just add color:
+- First identify what specific data the question needs that is NOT already
+  present in the given environmental_data (e.g. a missing metric like AQI,
+  humidity, wind, a forecast for a specific day, an active advisory, energy
+  prices/tariffs, industry-specific thresholds/regulations, etc.).
+- Search specifically for each of those missing pieces, not just general
+  news about the location.
+- Also include any other CURRENT, directly relevant information even if not
+  strictly "missing" — e.g. active heat advisories or warnings, official
+  weather forecasts, recent local air quality reports, relevant news, energy
+  or industry data — for that location and timeframe.
 
 Rules:
-- Be concise: a short paragraph (3-6 sentences) of factual findings, not a report.
-- Only include information you actually found via search; do not speculate.
+- Be concise: a short paragraph (3-6 sentences) of factual findings, not a
+  report. If you found specific numeric values to fill a gap, state them
+  clearly and specifically (e.g. "Current AQI in X is 42 (moderate) per
+  [source], as of [time]").
+- Only include information you actually found via search; do not speculate
+  or fabricate a value if search turns up nothing for it — say so instead.
 - If search turns up nothing clearly relevant, say so in one sentence instead
   of padding with generic climate facts.
 - Do not repeat back the environmental_data that was given to you; focus on
@@ -252,8 +289,13 @@ class ClimateAI:
 User question:
 {user_question}
 
-Find any current, directly relevant supplementary information (advisories,
-forecasts, air quality reports, relevant news) for this location/question."""
+Identify what data this question needs that is NOT already present above
+(e.g. a missing metric, a forecast, an advisory, energy/industry figures,
+regulatory thresholds), and search specifically for each missing piece, in
+addition to any other current, directly relevant supplementary information
+(advisories, forecasts, air quality reports, relevant news) for this
+location/question. Report specific values you find, not just general
+commentary."""
 
         try:
             response = await asyncio.wait_for(
@@ -318,6 +360,11 @@ Supplementary web context (retrieved via live search, may be partial):
         prompt += f"""
 User question:
 {user_question}
+
+Remember: if environmental_data above is missing something this question
+needs, use the supplementary web context (if provided) to fill that gap
+rather than declining to answer. Only say the data is missing if neither
+source has what's needed.
 """
 
         last_error = None
