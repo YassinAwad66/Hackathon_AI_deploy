@@ -1,0 +1,24 @@
+# --- Streamlit app (Forecast.py, chatbot page) ---
+streamlit>=1.38
+pandas>=2.0
+altair>=5.0
+geopandas>=0.14
+shapely>=2.0
+folium>=0.17
+streamlit-folium>=0.23
+Pillow>=10.0
+
+# --- Chatbot (climate_ai.py, Gemini) ---
+google-genai>=0.5
+pydantic>=2.0
+python-dotenv>=1.0
+
+# --- Notebook plotting (02/03/04 *.ipynb) ---
+matplotlib>=3.8
+jupyter>=1.0
+
+# --- FortyGuard SDK ---
+# Not on PyPI under this name — install per the hackathon's setup
+# instructions (e.g. `pip install -e .` against the SDK repo, or the
+# wheel/git URL FortyGuard provided). Uncomment/adjust once you have it:
+# fortyguard @ git+https://github.com/<org>/<fortyguard-sdk-repo>.git
